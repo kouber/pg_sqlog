@@ -34,7 +34,7 @@ log_truncate_on_rotation = 'on'
 
 ## Installation ##
 
-After making the project, copy the `conf/pg_sqlog.conf` file to the `conf.d/` PostgreSQL directory (or make the appropriate changes to your `postgresql.conf` file directly) and reload the service.
+After making the project, copy the `conf/pg_sqlog.conf` file to the `conf.d/` PostgreSQL directory (or make the appropriate changes to your `postgresql.conf` file directly) and restart the service.
 
 ## Examples ##
 
