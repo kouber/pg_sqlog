@@ -1,11 +1,13 @@
-# SQLog #
+# pg_sqlog #
 An extension providing access to PostgreSQL logs through SQL interface.
 
 ## Description ##
 
-`SQLog` allows to query a [foreign table](https://www.postgresql.org/docs/current/static/file-fdw.html), pointing to a log, recorded in a [CSV format](https://www.postgresql.org/docs/current/static/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG). It has special functions to extract the query duration of each query, as well as to group similar queries together.
+`pg_sqlog` allows to query a [foreign table](https://www.postgresql.org/docs/current/static/file-fdw.html), pointing to a log, recorded in a [CSV format](https://www.postgresql.org/docs/current/static/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG). It has special functions to extract the query duration of each query, as well as to group similar queries together.
 
 ## Prerequisites ##
+
+This extension depends on `file_fdw` as well as on the following configuration directives.
 
 ```
 log_destination   = 'syslog,csvlog' # 'csvlog' should be present
@@ -32,22 +34,14 @@ log_truncate_on_rotation = 'on'
 
 ## Installation ##
 
-After cloning the [postgresql-sql-schema](https://gitlab.mailjet.com/SQL/postgresql-sql-schema/) git project, enter the `extensions/sqlog` directory and run the building command.
-
-`$ sudo make install`
+After making the project, copy the `conf/pg_sqlog.conf` file to the `conf.d/` PostgreSQL directory (or make the appropriate changes to your `postgresql.conf` file directly) and reload the service.
 
 ## Examples ##
 
-Setting the context of all functions and views to 1 June 2017. After that point the `sqlog.log` contents point to that date.
+Get a summary of the errors reported for the current day.
 
 ```
-postgres=# SELECT sqlog.set_date('2017-06-01');
-  set_date
-------------
- 2017-06-01
-(1 row)
-
-postgres=# SELECT error_severity, COUNT(*) FROM sqlog.log GROUP BY 1;
+postgres=# SELECT error_severity, COUNT(*) FROM sqlog.log() GROUP BY 1;
  error_severity | count
 ----------------+-------
  FATAL          |     6
@@ -55,25 +49,6 @@ postgres=# SELECT error_severity, COUNT(*) FROM sqlog.log GROUP BY 1;
  LOG            |   949
  ERROR          |    10
 (4 rows)
-```
-
-Another way is to use the `sqlog.log()` function directly. After this call the context will be switched to the current day (5 June 2017).
-
-```
-postgres=# SELECT error_severity, COUNT(*) FROM sqlog.log() GROUP BY 1;
- error_severity | count
-----------------+-------
- FATAL          |     8
- WARNING        |   101
- LOG            |  3703
- ERROR          |    72
-(4 rows)
-
-postgres=# SELECT ftoptions FROM pg_foreign_table WHERE ftrelid = 'sqlog.log'::regclass;
-                              ftoptions
----------------------------------------------------------------------
- {filename=/var/log/postgresql/postgresql.2017-06-05.csv,format=csv}
-(1 row)
 ```
 
 Getting the top 5 slowest queries of the day.
@@ -106,9 +81,9 @@ Getting a random _autovacuum_ report for the day.
 postgres=# select * from sqlog.autovacuum() limit 1;
 -[ RECORD 1 ]-------------+---------------------------
 log_time                  | 2018-11-06 06:03:00.178+00
-database                  | p0196500
+database                  | db
 schema_name               | public
-table_name                | kafka_savepoint
+table_name                | account
 idx_scans                 | 1
 pages_removed             | 1
 pages_remain              | 16
