@@ -1,4 +1,4 @@
-\echo Use "CREATE EXTENSION sqlog" to load this file. \quit
+\echo Use "CREATE EXTENSION pg_sqlog" to load this file. \quit
 
 
 CREATE FUNCTION check_settings() RETURNS boolean AS $$
