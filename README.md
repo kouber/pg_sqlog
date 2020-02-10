@@ -7,6 +7,12 @@ An extension providing access to PostgreSQL logs through SQL interface.
 
 ## Prerequisites ##
 
+Set `log_min_duration_statement` to a non-negative value in order to record the slow queries.
+
+```
+log_min_duration_statement  = 1000  # logs every query taking more than 1 second
+```
+
 This extension depends on `file_fdw` as well as on the following configuration directives.
 
 ```
@@ -16,6 +22,12 @@ logging_collector = 'on'
 log_rotation_age  = '1d'            # at max 1 log file per day
 log_rotation_size = 0
 log_truncate_on_rotation = 'on'
+```
+
+To use the special `autovacuum` and `autoanalyze` reports you need to set `log_autovacuum_min_duration` to a non-negative value.
+
+```
+log_autovacuum_min_duration = 0
 ```
 
 ## Tables ##
