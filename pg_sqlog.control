@@ -1,5 +1,5 @@
 comment = 'Provide SQL interface to logs'
-default_version = '1.0'
+default_version = '1.1'
 requires = 'file_fdw'
 relocatable = false
 schema = 'sqlog'
