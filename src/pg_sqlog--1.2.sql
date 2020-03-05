@@ -138,7 +138,7 @@ CREATE FUNCTION preparable_query(message text) RETURNS text AS $$
           E'\\1?\\2',
           'g'
         ),
-        '([^\d])\d+([^\d])?',
+        '([^\d\w])\d+([^\d\w])?',
         E'\\1?\\2',
         'g'
       ),
