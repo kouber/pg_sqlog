@@ -17,7 +17,7 @@ This extension depends on `file_fdw` as well as on the following configuration d
 
 ```
 log_destination   = 'syslog,csvlog' # 'csvlog' should be present
-log_filename      = 'postgresql.%a' # any combination of %F, %Y, %m, %d and %a
+log_filename      = 'postgresql.%a' # any combination of %F, %Y, %m, %d, %a, etc.
 logging_collector = 'on'
 log_rotation_age  = '1d'            # at max 1 log file per day
 log_rotation_size = 0
