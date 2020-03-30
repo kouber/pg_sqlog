@@ -50,10 +50,10 @@ After making the project, copy the `conf/pg_sqlog.conf` file to the `conf.d/` Po
 
 ## Examples ##
 
-Get a summary of the errors reported for a given day.
+Get a summary of the errors reported for the current day.
 
 ```
-postgres=# SELECT error_severity, COUNT(*) FROM sqlog.log('2019-02-05') GROUP BY 1;
+postgres=# SELECT error_severity, COUNT(*) FROM sqlog.log() GROUP BY 1;
  error_severity | count
 ----------------+-------
  FATAL          |     6
@@ -66,7 +66,18 @@ postgres=# SELECT error_severity, COUNT(*) FROM sqlog.log('2019-02-05') GROUP BY
 Get the top 5 slowest queries of the current day.
 
 ```
-postgres=# SELECT sqlog.duration(message), sqlog.preparable_query(message) FROM sqlog.log() ORDER BY 1 DESC NULLS LAST LIMIT 5;
+SELECT
+  sqlog.duration(message),
+  sqlog.preparable_query(message)
+FROM
+  sqlog.log()
+WHERE
+  message ~ '^duration'
+ORDER BY
+  1 DESC
+LIMIT
+  5;
+
  duration  |                                 preparable_query
 -----------+----------------------------------------------------------------------------------
  10010.451 | select pg_sleep(?);
@@ -77,10 +88,24 @@ postgres=# SELECT sqlog.duration(message), sqlog.preparable_query(message) FROM 
 (5 rows)
 ```
 
-Get the most frequently logged query, along with its average duration.
+Get the most frequently logged _preparable_ query, along with its average duration, by grouping similar queries together.
 
 ```
-postgres=# SELECT sqlog.preparable_query(message), AVG(sqlog.duration(message)), COUNT(*) FROM sqlog.log('2017-06-01') GROUP BY 1 ORDER BY 2 DESC NULLS LAST LIMIT 1;
+SELECT
+  AVG(sqlog.duration(message)),
+  COUNT(*),
+  sqlog.preparable_query(message)
+FROM
+  sqlog.log()
+WHERE
+  message ~ '^duration'
+GROUP BY
+  3
+ORDER BY
+  2 DESC
+LIMIT
+  1;
+
                        preparable_query                       |          avg          | count
 --------------------------------------------------------------+-----------------------+-------
  UPDATE app SET credit=?+overdraft WHERE id=? and overdraft>? | 1158.1232790697674419 |    43
