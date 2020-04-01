@@ -87,12 +87,45 @@ OPTIONS
 
 
 CREATE FUNCTION set_date(timestamp = now()) RETURNS date AS $$
+DECLARE
+  log_path text;
 BEGIN
+  log_path := @extschema@.log_path($1);
+
   EXECUTE FORMAT('
     ALTER TABLE @extschema@.%I OPTIONS (SET filename %L)
-  ', 'log', @extschema@.log_path($1));
+  ', 'log', log_path);
 
   RETURN $1;
+EXCEPTION WHEN read_only_sql_transaction THEN
+  DECLARE
+    log_file text;
+  BEGIN
+    SELECT
+      REGEXP_REPLACE(
+        ftoptions::text,
+        '^.*?filename=([^,]+).*?$',
+        E'\\1'
+      )
+    FROM
+      pg_catalog.pg_foreign_table
+    WHERE
+      ftrelid = '@extschema@.log'::regclass
+    INTO
+      log_file;
+
+  IF log_path = log_file THEN
+    RETURN $1;
+  ELSE
+    log_file = REGEXP_REPLACE(log_file, '^' || CURRENT_SETTING('log_directory') || '/', '');
+  END IF;
+
+  RAISE NOTICE 'Dynamic date passing is not allowed on a slave node, falling back to "%"', log_file
+    USING ERRCODE = 'read_only_sql_transaction',
+          HINT    = 'Mind controlling the date by calling @extschema@.set_date() on the master node';
+  END;
+
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -197,7 +230,7 @@ DECLARE
 BEGIN
   PERFORM @extschema@.set_date($1);
 
-  IF VERSION() ~ '^PostgreSQL 9\.' THEN
+  IF CURRENT_SETTING('server_version_num')::int < 100000 THEN
     mask_suffix := 'CPU ([\.\d]+)s/([\.\d]+)u sec elapsed ([\.\d]+) sec$';
     usr_idx := 19;
     sys_idx := 18;
@@ -284,7 +317,7 @@ DECLARE
 BEGIN
   PERFORM @extschema@.set_date($1);
 
-  IF VERSION() ~ '^PostgreSQL 9\.' THEN
+  IF CURRENT_SETTING('server_version_num')::int < 100000 THEN
     mask_suffix := 'CPU ([\.\d]+)s/([\.\d]+)u sec elapsed ([\.\d]+) sec$';
     usr_idx := 5;
     sys_idx := 4;

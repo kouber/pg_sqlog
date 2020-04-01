@@ -1,3 +1,8 @@
+1.3
+---
+- Allow querying of slave node logs.
+- Optimise `autoanalyze()` and `autovacuum()` routines.
+
 1.2
 ---
 - Fix `preparable_query()` regular expression incorrect handling of numbers within database identifiers.
