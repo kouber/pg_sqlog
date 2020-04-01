@@ -86,7 +86,7 @@ LIMIT
  SELECT pg_sleep(?)                                           | 9002.774              |     2
  SELECT id, name FROM invoice WHERE status > ?                | 4367.3729834738293848 |    12
  UPDATE app SET credit=?+overdraft WHERE id=? and overdraft>? | 1158.1232790697674419 |    43
-(1 row)
+(3 rows)
 ```
 
 Get a random _autovacuum_ report for the day.
