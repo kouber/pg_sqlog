@@ -19,6 +19,11 @@
       "docfile": "README.md",
       "version": "1.3",
       "abstract": "Provide SQL interface to logs"
+    },
+    "config": {
+      "file": "conf/pg_sqlog.conf",
+      "version": "1.3",
+      "abstract": "Required PostgreSQL configuration"
     }
   },
   "meta-spec": {
