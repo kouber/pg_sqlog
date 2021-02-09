@@ -9,7 +9,7 @@
   "prereqs": {
     "runtime": {
       "requires": {
-        "hstore": 0
+        "file_fdw": 0
       }
     }
   },
