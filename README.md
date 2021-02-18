@@ -36,7 +36,7 @@ log_autovacuum_min_duration = 0
 
 ## Functions ##
 
-* `sqlog.log([timestamp])` - a [set returning](https://www.postgresql.org/docs/current/static/functions-srf.html) function, giving the contents of the PostgreSQL log file for a given day. If _interval_ is omitted, then the current day's log is returned. Calls `sqlog.set_date()` implicitly.
+* `sqlog.log([timestamp])` - a [set returning](https://www.postgresql.org/docs/current/static/functions-srf.html) function, giving the contents of the PostgreSQL log file for a given day. If _timestamp_ is omitted, then the current day's log is returned. Calls `sqlog.set_date()` implicitly.
 * `sqlog.set_date([timestamp])` - a function to control the `sqlog.log` _filename_ option. Once set to a given date, it stays that way until another call to it. Note that calling this function will influence the contents of the `sqlog.log` table for all the other concurrent sessions as well (if any).
 * `sqlog.duration(text)` - extracts the query duration from the _message_ field in milliseconds.
 * `sqlog.preparable_query(text)` - replaces all the possible arguments of a query found in the _message_ field with question marks, thus providing a preparable query, effectively grouping similar queries together.
