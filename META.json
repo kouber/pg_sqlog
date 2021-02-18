@@ -26,6 +26,16 @@
       "abstract": "Required PostgreSQL configuration"
     }
   },
+  "resources": {
+    "repository": {
+      "url":  "https://github.com/kouber/pg_sqlog.git",
+      "web":  "https://github.com/kouber/pg_sqlog/",
+      "type": "git"
+    },
+    "bugtracker": {
+        "web": "https://github.com/kouber/pg_sqlog/issues"
+    }
+  },
   "meta-spec": {
     "version": "1.0.0",
     "url": "http://pgxn.org/meta/spec.txt"
