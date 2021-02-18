@@ -40,6 +40,7 @@ log_autovacuum_min_duration = 0
 * `sqlog.set_date([timestamp])` - a function to control the `sqlog.log` _filename_ option. Once set to a given date, it stays that way until another call to it. Note that calling this function will influence the contents of the `sqlog.log` table for all the other concurrent sessions as well (if any).
 * `sqlog.duration(text)` - extracts the query duration from the _message_ field in milliseconds.
 * `sqlog.preparable_query(text)` - replaces all the possible arguments of a query found in the _message_ field with question marks, thus providing a preparable query, effectively grouping similar queries together.
+* `sqlog.summary(text, int [, int])` - strip meta data from the query and display the first N, the last N, or both characters of it. By default the first 30 and the last 30 characters will be shown. If -1 is passed for the second argument, no trimming will occur.
 * `sqlog.temporary_file_size(text)` - extracts the file size of each temporary file that has been created and logged, according to the `log_temp_files` configuration option. Pass `sqlog.message` as argument.
 * `sqlog.autovacuum([timestamp])` - a [set returning](https://www.postgresql.org/docs/current/static/functions-srf.html) function, giving human readable report of the _autovacuum_ runs for a given day. Calls `sqlog.set_date()` implicitly.
 * `sqlog.autoanalyze([timestamp])` - a [set returning](https://www.postgresql.org/docs/current/static/functions-srf.html) function, giving human readable report of the _autoanalyze_ runs for a given day. Calls `sqlog.set_date()` implicitly.
@@ -47,6 +48,10 @@ log_autovacuum_min_duration = 0
 ## Installation ##
 
 After making the project, copy the `conf/pg_sqlog.conf` file to the `conf.d/` PostgreSQL directory (or make the appropriate changes to your `postgresql.conf` file directly) and restart the service.
+
+## Upgrading from PostgreSQL 12 (or older) ##
+
+Drop and create the extension to have proper _backend_type_ parsing.
 
 ## Examples ##
 
@@ -89,10 +94,30 @@ LIMIT
 (3 rows)
 ```
 
+Show the summary for some queries from yesterday.
+
+```
+SELECT
+  log_time::time,
+  sqlog.duration(message),
+  sqlog.summary(message)
+FROM
+  sqlog.log('yesterday')
+WHERE
+  message ~ '^duration';
+
+   log_time      | duration |                              summary                              
+-----------------+----------+------------------------------------------------------------------
+ 19:09:44.942+00 | 8604.054 | SELECT DISTINCT (accounts_uuid ... _jupiterprofile"."venus" = 0))
+ 19:37:52.766+00 | 1209.055 | UPDATE "infrastructure_jupiter ... be5c-5gb7-9d7b-b30bg6cf5b56'))
+ 19:40:05.506+00 | 1628.792 | SELECT (date_trunc('hour', tim ... r', time)) ORDER BY "hour" ASC
+(3 rows)
+```
+
 Get a random _autovacuum_ report for the day.
 
 ```
-postgres=# select * from sqlog.autovacuum() limit 1;
+postgres=# SELECT * FROM sqlog.autovacuum() limit 1;
 -[ RECORD 1 ]-------------+---------------------------
 log_time                  | 2018-11-06 06:03:00.178+00
 database                  | db

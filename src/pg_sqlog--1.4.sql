@@ -49,7 +49,7 @@ BEGIN
 
   RETURN CURRENT_SETTING('log_directory') || '/' || filename || '.csv';
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
 CREATE SERVER sqlog FOREIGN DATA WRAPPER file_fdw;
@@ -84,6 +84,15 @@ SERVER
   sqlog
 OPTIONS
   (filename '/dev/null', format 'csv');
+
+
+DO $$
+BEGIN
+  IF CURRENT_SETTING('server_version_num')::int >= 130000 THEN
+    ALTER FOREIGN TABLE @extschema@.log ADD backend_type text;
+  END IF;
+END
+$$ LANGUAGE plpgsql;
 
 
 CREATE FUNCTION set_date(timestamp = now()) RETURNS date AS $$
@@ -127,7 +136,7 @@ EXCEPTION WHEN read_only_sql_transaction THEN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 CREATE FUNCTION log(timestamp = now()) RETURNS SETOF log AS $$
@@ -148,7 +157,7 @@ EXCEPTION
       USING ERRCODE = 'bad_copy_file_format',
             HINT    = REGEXP_REPLACE(context, E'^(.*?)\nPL/pgSQL.*$', E'\\1');
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
 CREATE FUNCTION duration(message text) RETURNS numeric AS $$
@@ -158,7 +167,7 @@ CREATE FUNCTION duration(message text) RETURNS numeric AS $$
     ELSE
       NULL
     END;
-$$ LANGUAGE sql IMMUTABLE STRICT;
+$$ LANGUAGE sql IMMUTABLE STRICT SECURITY DEFINER;
 
 
 CREATE FUNCTION preparable_query(message text) RETURNS text AS $$
@@ -179,17 +188,36 @@ CREATE FUNCTION preparable_query(message text) RETURNS text AS $$
       E'\\1?\\2',
       'g'
     );
-$$ LANGUAGE sql IMMUTABLE STRICT;
+$$ LANGUAGE sql IMMUTABLE STRICT SECURITY DEFINER;
+
+
+CREATE FUNCTION summary(text, lead int = 30, trail int = NULL) RETURNS text AS $$
+DECLARE
+  str text;
+BEGIN
+  str := REGEXP_REPLACE($1, '^(duration: [^:]+ (<unnamed>|statement|execute [^:]+): +)?', '');
+
+  IF $2 < 0 OR LENGTH(str) <= $2 THEN
+    RETURN str;
+  END IF;
+
+  IF trail IS NULL THEN
+    trail := lead;
+  END IF;
+
+  RETURN SUBSTRING(str, 1, lead) || ' ... ' || SUBSTRING(str, LENGTH(str) - trail + 1);
+END
+$$ LANGUAGE plpgsql IMMUTABLE SECURITY DEFINER;
 
 
 CREATE FUNCTION temporary_file_size(text) RETURNS bigint AS $$
   SELECT
     CASE WHEN $1 ~ '^temporary file:' THEN
-      regexp_replace($1, '^temporary file:.*? size (\d+)$', E'\\1')::bigint
+      REGEXP_REPLACE($1, '^temporary file:.*? size (\d+)$', E'\\1')::bigint
     ELSE
       0
     END;
-$$ LANGUAGE sql IMMUTABLE STRICT;
+$$ LANGUAGE sql IMMUTABLE STRICT SECURITY DEFINER;
 
 
 CREATE TYPE autovacuum AS (
@@ -213,31 +241,39 @@ CREATE TYPE autovacuum AS (
   write_mbs                 numeric,
   cpu_user                  numeric,
   cpu_system                numeric,
-  elapsed                   numeric
+  elapsed                   numeric,
+  wal_records               int,
+  wal_full_page_images      int,
+  wal_bytes                 bigint
 );
 
 
 -- in sync with output format as defined within the PostgreSQL source code:
--- src/backend/commands/vacuumlazy.c
+-- src/access/heap/vacuumlazy.c
 -- src/backend/utils/misc/pg_rusage.c
 
 CREATE FUNCTION autovacuum(timestamp = now()) RETURNS SETOF autovacuum AS $$
 DECLARE
-  mask_suffix text;
-  usr_idx     smallint;
-  sys_idx     smallint;
-  context     text;
+  cpu_usage text;
+  wal_usage text := '$';
+  usr_idx   smallint;
+  sys_idx   smallint;
+  context   text;
 BEGIN
   PERFORM @extschema@.set_date($1);
 
-  IF CURRENT_SETTING('server_version_num')::int < 100000 THEN
-    mask_suffix := 'CPU ([\.\d]+)s/([\.\d]+)u sec elapsed ([\.\d]+) sec$';
-    usr_idx := 19;
-    sys_idx := 18;
-  ELSE
-    mask_suffix := 'CPU: user: ([^ ]+) s, system: ([^ ]+) s, elapsed: ([^ ]+) s$';
+  IF CURRENT_SETTING('server_version_num')::int >= 130000 THEN
+    wal_usage := '.*?WAL usage: (\d+) records, (\d+) full page images, (\d+) bytes$';
+  END IF;
+
+  IF CURRENT_SETTING('server_version_num')::int >= 100000 THEN
+    cpu_usage := 'CPU: user: ([^ ]+) s, system: ([^ ]+) s, elapsed: ([^ ]+) s';
     usr_idx := 18;
     sys_idx := 19;
+  ELSE
+    cpu_usage := 'CPU ([\.\d]+)s/([\.\d]+)u sec elapsed ([\.\d]+) sec';
+    usr_idx := 19;
+    sys_idx := 18;
   END IF;
 
   RETURN
@@ -263,13 +299,16 @@ BEGIN
     m[17]::numeric,
     m[usr_idx]::numeric,
     m[sys_idx]::numeric,
-    m[20]::numeric
+    m[20]::numeric,
+    m[21]::int,
+    m[22]::int,
+    m[23]::bigint
   FROM (
     SELECT
       log_time,
       REGEXP_MATCHES(
         message,
-        '^automatic(?: aggressive)? vacuum of table "([^\.]+)\.([^\.]+)\.([^\.]+)": index scans: (\d+).*?pages: (\d+) removed, (\d+) remain(?:, (\d+) skipped due to pins)?(?:, (\d+) skipped frozen)?.*?tuples: (\d+) removed, (\d+) remain(?:, (\d+) are dead but not yet removable)?(?:, oldest xmin: (\d+))?.*?buffer usage: (\d+) hits, (\d+) misses, (\d+) dirtied.*?avg read rate: ([^ ]+) MB/s, avg write rate: ([^ ]+) MB/s.*?system usage: ' || mask_suffix,
+        '^automatic(?: aggressive)? vacuum of table "([^\.]+)\.([^\.]+)\.([^\.]+)": index scans: (\d+).*?pages: (\d+) removed, (\d+) remain(?:, (\d+) skipped due to pins)?(?:, (\d+) skipped frozen)?.*?tuples: (\d+) removed, (\d+) remain(?:, (\d+) are dead but not yet removable)?(?:, oldest xmin: (\d+))?.*?buffer usage: (\d+) hits, (\d+) misses, (\d+) dirtied.*?avg read rate: ([^ ]+) MB/s, avg write rate: ([^ ]+) MB/s.*?system usage: ' || cpu_usage || wal_usage,
         'g'
       ) AS m
     FROM
@@ -290,7 +329,7 @@ EXCEPTION
       USING ERRCODE = 'bad_copy_file_format',
             HINT    = REGEXP_REPLACE(context, E'^(.*?)\nPL/pgSQL.*$', E'\\1');
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
 CREATE TYPE autoanalyze AS (
@@ -363,4 +402,4 @@ EXCEPTION
       USING ERRCODE = 'bad_copy_file_format',
             HINT    = REGEXP_REPLACE(context, E'^(.*?)\nPL/pgSQL.*$', E'\\1');
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
