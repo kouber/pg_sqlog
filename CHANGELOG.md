@@ -1,3 +1,8 @@
+1.5
+---
+- Provide PostgreSQL 14 support:
+  - add `leader_pid` and `query_id` columns to `sqlog.log()` output.
+
 1.4
 ---
 - Provide PostgreSQL 13 support:

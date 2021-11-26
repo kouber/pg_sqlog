@@ -91,6 +91,11 @@ BEGIN
   IF CURRENT_SETTING('server_version_num')::int >= 130000 THEN
     ALTER FOREIGN TABLE @extschema@.log ADD backend_type text;
   END IF;
+
+  IF CURRENT_SETTING('server_version_num')::int >= 140000 THEN
+    ALTER FOREIGN TABLE @extschema@.log ADD leader_pid int;
+    ALTER FOREIGN TABLE @extschema@.log ADD query_id   bigint;
+  END IF;
 END
 $$ LANGUAGE plpgsql;
 

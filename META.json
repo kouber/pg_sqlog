@@ -2,7 +2,7 @@
   "name": "pg_sqlog",
   "abstract": "An extension providing access to PostgreSQL logs through SQL interface.",
   "description": "pg_sqlog allows to query a foreign table, pointing to a log, recorded in a CSV format. It has special functions to extract the query duration of each query, as well as to group similar queries together.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "maintainer": "Kouber Saparev <kouber@gmail.com>",
   "license": "bsd",
   "tags": [ "csvlog", "csv", "logging", "log", "fdw" ],
@@ -15,14 +15,14 @@
   },
   "provides": {
     "pg_sqlog": {
-      "file": "src/pg_sqlog--1.4.sql",
+      "file": "src/pg_sqlog--1.5.sql",
       "docfile": "README.md",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "abstract": "Provide SQL interface to logs"
     },
     "config": {
       "file": "conf/pg_sqlog.conf",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "abstract": "Required PostgreSQL configuration"
     }
   },

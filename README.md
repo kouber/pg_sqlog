@@ -53,6 +53,10 @@ After making the project, copy the `conf/pg_sqlog.conf` file to the `conf.d/` Po
 
 Drop and create the extension to have proper _backend_type_ parsing.
 
+## Upgrading from PostgreSQL 13 (or older) ##
+
+Drop and create the extension to have proper _leader_pid_ and _query_id_ parsing.
+
 ## Examples ##
 
 Get a summary of the errors reported for the day.
