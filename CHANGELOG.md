@@ -1,3 +1,7 @@
+1.6
+---
+- Allow caching of daily logs.
+
 1.5
 ---
 - Provide PostgreSQL 14 support:

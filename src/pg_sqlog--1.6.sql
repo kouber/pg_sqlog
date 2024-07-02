@@ -100,6 +100,84 @@ END
 $$ LANGUAGE plpgsql;
 
 
+CREATE FUNCTION format_cache_table(timestamp) RETURNS name AS $$
+  SELECT 'log_' || TO_CHAR($1, 'YYYYMMDD');
+$$ LANGUAGE sql IMMUTABLE STRICT;
+
+
+CREATE FUNCTION create_cache(timestamp = now(), rebuild bool = false) RETURNS name AS $$
+DECLARE
+  tbl name;
+  cln name;
+BEGIN
+  BEGIN
+    SET @extschema@.caching_in_progress TO on;
+
+    PERFORM pg_advisory_lock(current_setting('@extschema@.advisory_lock_key')::bigint);
+
+    IF NOT current_setting('@extschema@.cache')::bool THEN
+      RAISE EXCEPTION 'Caching is disabled'
+      USING HINT = 'Check @extschema@.cache setting';
+    END IF;
+
+    tbl := @extschema@.format_cache_table($1);
+
+    RAISE NOTICE 'Building daily cache "%" ...', tbl;
+
+    IF rebuild THEN
+      EXECUTE FORMAT('DROP TABLE IF EXISTS @extschema@.%I', tbl);
+    END IF;
+
+    EXECUTE FORMAT('
+      CREATE UNLOGGED TABLE IF NOT EXISTS @extschema@.%I AS SELECT * FROM @extschema@.log(%L)',
+      tbl,
+      $1
+    );
+
+    FOR cln
+      IN
+    SELECT
+      fld
+    FROM
+      unnest(string_to_array(replace(current_setting('@extschema@.cache_index_fields'), ' ', ''), ',')) fld
+    LOOP
+      BEGIN
+        EXECUTE FORMAT('CREATE INDEX IF NOT EXISTS %1$s_%2$s_idx ON @extschema@.%1$I (%2$I)', tbl, cln);
+      EXCEPTION WHEN duplicate_table THEN
+      END;
+    END LOOP;
+  EXCEPTION WHEN undefined_object THEN
+    RAISE NOTICE 'incomplete cache configuration';
+  END;
+
+  SET @extschema@.caching_in_progress TO off;
+
+  PERFORM pg_advisory_unlock_all();
+
+  RETURN tbl;
+END
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+CREATE FUNCTION drop_cache(tbl name) RETURNS name AS $$
+BEGIN
+  EXECUTE FORMAT('DROP TABLE IF EXISTS @extschema@.%I', $1);
+
+  RETURN $1;
+END
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+CREATE FUNCTION drop_cache(timestamp = now()) RETURNS name AS $$
+  SELECT @extschema@.drop_cache(@extschema@.format_cache_table($1));
+$$ LANGUAGE sql SECURITY DEFINER;
+
+
+CREATE FUNCTION day_is_completed(timestamp) RETURNS boolean AS $$
+  SELECT $1 AT TIME ZONE current_setting('log_timezone') < CURRENT_DATE AT TIME ZONE current_setting('log_timezone');
+$$ LANGUAGE sql;
+
+
 CREATE FUNCTION set_date(timestamp = now()) RETURNS date AS $$
 DECLARE
   log_path text;
@@ -109,6 +187,12 @@ BEGIN
   EXECUTE FORMAT('ALTER TABLE @extschema@.%I OPTIONS (SET filename %L)',
                  'log',
                  log_path);
+
+  IF current_setting('@extschema@.cache', true)::bool AND current_setting('@extschema@.cache_auto', true)::bool AND current_setting('@extschema@.caching_in_progress', true)::bool IS DISTINCT FROM TRUE THEN
+    IF @extschema@.day_is_completed($1) THEN
+      PERFORM @extschema@.create_cache($1);
+    END IF;
+  END IF;
 
   RETURN $1;
 EXCEPTION WHEN read_only_sql_transaction THEN
@@ -144,11 +228,24 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
-CREATE FUNCTION log(timestamp = now()) RETURNS SETOF log AS $$
+CREATE FUNCTION log(timestamp = now()) RETURNS SETOF @extschema@.log AS $$
 DECLARE
   context text;
+  tbl     name;
 BEGIN
   PERFORM @extschema@.set_date($1);
+
+  tbl := @extschema@.format_cache_table($1);
+
+  PERFORM NULL FROM pg_tables WHERE schemaname = '@extschema@' AND tablename = tbl;
+
+  IF FOUND THEN
+    IF NOT @extschema@.day_is_completed($1) THEN
+      RAISE NOTICE 'Using cache "%"', tbl;
+    END IF;
+
+    RETURN QUERY EXECUTE FORMAT(REGEXP_REPLACE(current_query(), '@extschema@\.log ?\(.*?\)', '@extschema@.%s'), tbl);
+  END IF;
 
   RETURN QUERY SELECT * FROM @extschema@.log;
 EXCEPTION
