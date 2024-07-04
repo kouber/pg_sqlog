@@ -3,6 +3,18 @@ CREATE OR REPLACE FUNCTION sqlog.format_cache_table(timestamp) RETURNS name AS $
 $$ LANGUAGE sql IMMUTABLE STRICT;
 
 
+CREATE OR REPLACE FUNCTION sqlog.cache_exists(timestamp) RETURNS name AS $$
+  SELECT
+    tablename
+  FROM
+    pg_tables
+  WHERE
+    schemaname = 'sqlog'
+  AND
+    tablename = sqlog.format_cache_table($1);
+$$ LANGUAGE sql STABLE STRICT;
+
+
 CREATE OR REPLACE FUNCTION sqlog.create_cache(timestamp = now(), rebuild bool = false) RETURNS name AS $$
 DECLARE
   tbl name;

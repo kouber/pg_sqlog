@@ -105,6 +105,18 @@ CREATE FUNCTION format_cache_table(timestamp) RETURNS name AS $$
 $$ LANGUAGE sql IMMUTABLE STRICT;
 
 
+CREATE FUNCTION cache_exists(timestamp) RETURNS name AS $$
+  SELECT
+    tablename
+  FROM
+    pg_tables
+  WHERE
+    schemaname = '@extschema@'
+  AND
+    tablename = @extschema@.format_cache_table($1);
+$$ LANGUAGE sql STABLE STRICT;
+
+
 CREATE FUNCTION create_cache(timestamp = now(), rebuild bool = false) RETURNS name AS $$
 DECLARE
   tbl name;
