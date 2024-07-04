@@ -111,8 +111,6 @@ DECLARE
   cln name;
 BEGIN
   BEGIN
-    SET @extschema@.caching_in_progress TO on;
-
     PERFORM pg_advisory_lock(current_setting('@extschema@.advisory_lock_key')::bigint);
 
     IF NOT current_setting('@extschema@.cache')::bool THEN
@@ -149,8 +147,6 @@ BEGIN
   EXCEPTION WHEN undefined_object THEN
     RAISE NOTICE 'incomplete cache configuration';
   END;
-
-  SET @extschema@.caching_in_progress TO off;
 
   PERFORM pg_advisory_unlock_all();
 
