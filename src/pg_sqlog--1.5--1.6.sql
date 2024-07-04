@@ -20,6 +20,12 @@ DECLARE
   tbl name;
   cln name;
 BEGIN
+  IF pg_is_in_recovery() THEN
+    RAISE NOTICE 'caching on a replica is not supported';
+
+    RETURN NULL;
+  END IF;
+
   BEGIN
     PERFORM pg_advisory_lock(current_setting('sqlog.advisory_lock_key')::bigint);
 
@@ -70,6 +76,10 @@ BEGIN
   EXECUTE FORMAT('DROP TABLE IF EXISTS sqlog.%I', $1);
 
   RETURN $1;
+EXCEPTION WHEN read_only_sql_transaction THEN
+  RAISE NOTICE 'caching on a replica is not supported';
+
+  RETURN NULL;
 END
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
