@@ -188,12 +188,6 @@ BEGIN
                  'log',
                  log_path);
 
-  IF current_setting('@extschema@.cache', true)::bool AND current_setting('@extschema@.cache_auto', true)::bool AND current_setting('@extschema@.caching_in_progress', true)::bool IS DISTINCT FROM TRUE THEN
-    IF @extschema@.day_is_completed($1) THEN
-      PERFORM @extschema@.create_cache($1);
-    END IF;
-  END IF;
-
   RETURN $1;
 EXCEPTION WHEN read_only_sql_transaction THEN
   DECLARE
@@ -228,24 +222,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
-CREATE FUNCTION log(timestamp = now()) RETURNS SETOF @extschema@.log AS $$
+CREATE FUNCTION log(timestamp = now()) RETURNS SETOF log AS $$
 DECLARE
   context text;
-  tbl     name;
 BEGIN
   PERFORM @extschema@.set_date($1);
-
-  tbl := @extschema@.format_cache_table($1);
-
-  PERFORM NULL FROM pg_tables WHERE schemaname = '@extschema@' AND tablename = tbl;
-
-  IF FOUND THEN
-    IF NOT @extschema@.day_is_completed($1) THEN
-      RAISE NOTICE 'Using cache "%"', tbl;
-    END IF;
-
-    RETURN QUERY EXECUTE FORMAT(REGEXP_REPLACE(current_query(), '@extschema@\.log ?\(.*?\)', '@extschema@.%s'), tbl);
-  END IF;
 
   RETURN QUERY SELECT * FROM @extschema@.log;
 EXCEPTION
