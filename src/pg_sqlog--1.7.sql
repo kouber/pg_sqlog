@@ -179,7 +179,7 @@ BEGIN
     IF $1::date >= CURRENT_DATE - '1 day'::interval THEN
       EXECUTE FORMAT('CREATE OR REPLACE VIEW @extschema@.today AS SELECT * FROM @extschema@.%I', tbl);
 
-      IF @extschema@.cache_exists($1 - '1 day'::interval) THEN
+      IF @extschema@.cache_exists($1 - '1 day'::interval) IS NOT NULL THEN
         EXECUTE FORMAT('CREATE OR REPLACE VIEW @extschema@.yesterday AS SELECT * FROM @extschema@.%I', @extschema@.format_cache_table($1 - '1 day'::interval));
       END IF;
     END IF;

@@ -62,7 +62,7 @@ BEGIN
     IF $1::date >= CURRENT_DATE - '1 day'::interval THEN
       EXECUTE FORMAT('CREATE OR REPLACE VIEW sqlog.today AS SELECT * FROM sqlog.%I', tbl);
 
-      IF sqlog.cache_exists($1 - '1 day'::interval) THEN
+      IF sqlog.cache_exists($1 - '1 day'::interval) IS NOT NULL THEN
         EXECUTE FORMAT('CREATE OR REPLACE VIEW sqlog.yesterday AS SELECT * FROM sqlog.%I', sqlog.format_cache_table($1 - '1 day'::interval));
       END IF;
     END IF;
