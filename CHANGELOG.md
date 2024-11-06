@@ -1,3 +1,9 @@
+1.7
+---
+- Rename `sqlog.create_cache()` to `sqlog.cache()`;
+- Introduce automatic cache expiry mechanism through `sqlog.expire_cache()` routine and `sqlog.cache_expire_interval` configuration option;
+- Add `sqlog.today` and `sqlog.yesterday` views.
+
 1.6
 ---
 - Allow caching of daily logs.
