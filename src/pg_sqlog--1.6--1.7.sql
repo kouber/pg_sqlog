@@ -60,11 +60,18 @@ BEGIN
 
     -- switch sqlog.today & sqlog.yesterday
     IF $1::date >= CURRENT_DATE - '1 day'::interval THEN
-      EXECUTE FORMAT('CREATE OR REPLACE VIEW sqlog.today AS SELECT * FROM sqlog.%I', tbl);
-
-      IF sqlog.cache_exists($1 - '1 day'::interval) IS NOT NULL THEN
-        EXECUTE FORMAT('CREATE OR REPLACE VIEW sqlog.yesterday AS SELECT * FROM sqlog.%I', sqlog.format_cache_table($1 - '1 day'::interval));
-      END IF;
+      DECLARE
+        day name;
+      BEGIN
+        FOREACH day IN ARRAY ARRAY['today', 'yesterday'] LOOP
+          tbl := sqlog.cache_exists(day::timestamp);
+          IF tbl IS NOT NULL THEN
+            EXECUTE FORMAT('CREATE OR REPLACE VIEW sqlog.%s AS SELECT * FROM sqlog.%I', day, tbl);
+          ELSE
+            EXECUTE FORMAT('DROP VIEW IF EXISTS sqlog.%s', day);
+          END IF;
+        END LOOP;
+      END;
     END IF;
   EXCEPTION WHEN undefined_object THEN
     RAISE NOTICE 'incomplete cache configuration';
@@ -74,7 +81,7 @@ BEGIN
 
   RETURN tbl;
 END
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION sqlog.expire_cache(keep interval = NULL) RETURNS SETOF name AS $$
@@ -122,4 +129,7 @@ EXCEPTION WHEN read_only_sql_transaction THEN
 
   RETURN NULL;
 END
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
+
+ALTER FUNCTION sqlog.drop_cache(name) SECURITY INVOKER;
+ALTER FUNCTION sqlog.drop_cache(timestamp) SECURITY INVOKER;

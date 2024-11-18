@@ -177,11 +177,18 @@ BEGIN
 
     -- switch @extschema@.today & @extschema@.yesterday
     IF $1::date >= CURRENT_DATE - '1 day'::interval THEN
-      EXECUTE FORMAT('CREATE OR REPLACE VIEW @extschema@.today AS SELECT * FROM @extschema@.%I', tbl);
-
-      IF @extschema@.cache_exists($1 - '1 day'::interval) IS NOT NULL THEN
-        EXECUTE FORMAT('CREATE OR REPLACE VIEW @extschema@.yesterday AS SELECT * FROM @extschema@.%I', @extschema@.format_cache_table($1 - '1 day'::interval));
-      END IF;
+      DECLARE
+        day name;
+      BEGIN
+        FOREACH day IN ARRAY ARRAY['today', 'yesterday'] LOOP
+          tbl := @extschema@.cache_exists(day::timestamp);
+          IF tbl IS NOT NULL THEN
+            EXECUTE FORMAT('CREATE OR REPLACE VIEW @extschema@.%s AS SELECT * FROM @extschema@.%I', day, tbl);
+          ELSE
+            EXECUTE FORMAT('DROP VIEW IF EXISTS @extschema@.%s', day);
+          END IF;
+        END LOOP;
+      END;
     END IF;
   EXCEPTION WHEN undefined_object THEN
     RAISE NOTICE 'incomplete cache configuration';
@@ -191,7 +198,7 @@ BEGIN
 
   RETURN tbl;
 END
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 
 
@@ -205,15 +212,15 @@ EXCEPTION WHEN read_only_sql_transaction THEN
 
   RETURN NULL;
 END
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 
 CREATE FUNCTION drop_cache(timestamp = now()) RETURNS name AS $$
   SELECT @extschema@.drop_cache(@extschema@.format_cache_table($1));
-$$ LANGUAGE sql SECURITY DEFINER;
+$$ LANGUAGE sql;
 
 
-CREATE FUNCTION @extschema@.expire_cache(keep interval = NULL) RETURNS SETOF name AS $$
+CREATE FUNCTION expire_cache(keep interval = NULL) RETURNS SETOF name AS $$
 DECLARE
   tbl name;
 BEGIN
